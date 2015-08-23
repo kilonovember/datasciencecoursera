@@ -1,0 +1,91 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Charles Knell"
+date: "August 17, 2015"
+output: html_document
+---
+
+The task is to predict how each element of a sample of twenty exercises were performed. "How" is one of five classifications (A,B,C,D, or E).
+The training data set contains 19,622 records. Each represents a single instance of an exercise performance. The data, when viewed as a table, consists of 160 columns, each represents some attribute of the exercise performance. Many of these columns contain no data, or perhaps a very small number of entries. These were eliminated as having no probitive value.
+
+The data set selected for training contains 51 columns. It shares 50 columns with the data to be used later in another part of this assignment. The 51st column contains the "classe" information which is used to train the model. We will use the model to infer the "classe" in the second data set based on what the model has "learned".
+
+First we load the necessary packages and set up the two files as data frames:
+
+```{r}
+library("caret", lib.loc="/Library/Frameworks/R.framework/Versions/3.1/Resources/library")
+setwd("~/datascience/classwork/MachineLearning")
+pml.training <- read.csv("pml-training.csv")
+pml.testing <- read.csv("pml-testing.csv")
+subset.training <- pml.training[,c(8:11,37:49,60:68,84:86,113:124,151:160)]
+subset.testing <- pml.training[,c(8:11,37:49,60:68,84:86,113:124,151:159)]
+
+```
+
+A requirement for this exercise is to " ... describe what they expect the out of sample error to be and estimate the error appropriately with cross-validation?" Other students have pointed out that depending on what method is used to create the model, the cross-validation may already be "cooked-in" to the function creating the model. Nonetheless, the requirements are the requirements:
+
+We subset the training data into two sets, one for the training and a second for cross-validation fodder, a test set.
+
+```{r}
+inTrain <- createDataPartition(y=subset.training$classe, p=0.75, list=FALSE)
+training.Partition <- subset.training[inTrain,]
+testing.Partition <- subset.training[-inTrain,]
+
+```
+
+To insure a reproducable result, we seed the psuedo-random number generator:
+
+```{r}
+set.seed(618200)
+
+```
+
+We fit a model to the training subset of the data. The model I first tried was "rpart", but this yielded results no better than a coin toss, so I took another student's suggestion and went with the "treebag" method:
+```{r results="hide"}
+modelFit.treebag <- train(classe ~., method="treebag", training.Partition)
+```
+
+We'll use the output of the pedict function in creating a confusion matrix. The output is lengthy, so I've suppressed it in this document, but it is an important component in making the confusion matrix, so I want to draw attention to it.:
+```{r results="hide"}
+predict(modelFit.treebag, newdata=subset.testing)
+```
+
+A confusion matrix shows how well the model predicted the outcomes for the training data itself and for the out-of-sample data.
+```{r}
+# The training, or in-sample data
+#
+confusion.matrix.training <- table(training.Partition$classe, predict(modelFit.treebag, newdata=training.Partition))
+confusion.matrix.training
+
+```
+
+```{r}
+# The testing, or out-of-sample data
+#
+confusion.matrix.testing <- table(testing.Partition$classe, predict(modelFit.treebag, newdata=testing.Partition))
+confusion.matrix.testing
+```
+
+
+```{r}
+# Computing the accuracy of the prediction on the training data
+#
+confusion.matrix.training.correctCount <- sum(diag(table(training.Partition$classe, predict(modelFit.treebag, newdata=training.Partition))))
+confusion.matrix.training.incorrectCount <- sum(confusion.matrix.training) - confusion.matrix.training.correctCount
+accuracy.training <- confusion.matrix.training.correctCount / (confusion.matrix.training.correctCount+confusion.matrix.training.incorrectCount)
+accuracy.training
+
+```
+
+Given the flawless performance on the training set, I expect a nearly-identical outcome on the portion reserved for testing.
+
+```{r}
+# Accuracy of the prediction on the test data.
+#
+confusion.matrix.testing.correctCount <- sum(diag(table(testing.Partition$classe, predict(modelFit.treebag, newdata=testing.Partition))))
+confusion.matrix.testing.incorrectCount <- sum(confusion.matrix.testing) - confusion.matrix.testing.correctCount
+accuracy.testing <- confusion.matrix.testing.correctCount / (confusion.matrix.testing.correctCount+confusion.matrix.testing.incorrectCount)
+accuracy.testing
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
